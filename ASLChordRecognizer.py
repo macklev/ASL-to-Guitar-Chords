@@ -1,8 +1,11 @@
+from pyexpat import features
+
 import cv2
 import mediapipe as mp
 import numpy as np
 import csv
 import joblib
+import pygame
 from collections import deque
 
 class ASLChordRecognizer:
@@ -22,7 +25,7 @@ class ASLChordRecognizer:
         # Smoothing
         self.history = deque(maxlen=5)
 
-        # Model (only load in predict mode)
+        # Model
         self.model = None
         if self.mode == "predict":
             try:
@@ -41,10 +44,25 @@ class ASLChordRecognizer:
             "G": "G Major"
         }
 
+        pygame.mixer.init()
+
+        self.sound_map = {
+            "A": "sounds/A.wav",
+            "B": "sounds/B.wav",
+            "C": "sounds/C.wav",
+            "D": "sounds/D.wav",
+            "E": "sounds/E.wav",
+            "F": "sounds/F.wav",
+            "G": "sounds/G.wav"
+        }
+
+        self.last_played = None
+
     # -----------------------------
     def preprocess_frame(self, frame):
         frame = cv2.flip(frame, 1)
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        rgb.flags.writeable = False
         return frame, rgb
 
     # -----------------------------
@@ -75,8 +93,15 @@ class ASLChordRecognizer:
 
     # -----------------------------
     def predict_letter(self, features):
-        if self.model is None or features is None:
+        if self.model is None:
+            print("Model is None — asl_model.pkl did not load")
             return None
+
+        if features is None:
+            print("Features are None — no hand landmarks")
+            return None
+
+        print("Features length:", len(features))
         return self.model.predict([features])[0]
 
     # -----------------------------
@@ -114,22 +139,50 @@ class ASLChordRecognizer:
 
         return frame
 
+
+    def play_chord_sound(self, letter):
+        if letter is None:
+            return
+
+        if letter == self.last_played:
+            return
+
+        sound_file = self.sound_map.get(letter)
+
+        if sound_file:
+            pygame.mixer.music.load(sound_file)
+            pygame.mixer.music.play()
+            self.last_played = letter
     # -----------------------------
     def run(self):
-        cap = cv2.VideoCapture(1)  # adjust if needed
+        print("Run method started")
+
+        cap = cv2.VideoCapture(1)
+        print("Camera object created")
+
+        if not cap.isOpened():
+            print("Camera did not open. Try VideoCapture(1) instead.")
+            return
+
+        print("Camera opened successfully")
 
         label = None
         if self.mode == "collect":
             label = input("Enter label (A-G): ")
 
         while True:
+            print("Loop running")
+
             ret, frame = cap.read()
+    
+
             if not ret:
                 print("Failed to grab frame")
                 break
 
             frame, rgb = self.preprocess_frame(frame)
             results = self.hands.process(rgb)
+            print("MediaPipe detected hand:", results.multi_hand_landmarks is not None)
 
             coords, features = self.extract_landmarks(results)
 
@@ -141,15 +194,20 @@ class ASLChordRecognizer:
                     self.collect_data(features, label)
 
             elif self.mode == "predict":
+                print("Predict mode active")
                 letter = self.predict_letter(features)
+                print("Raw prediction:", letter)
+
                 letter = self.smooth_prediction(letter)
                 chord = self.get_chord(letter)
+                self.play_chord_sound(letter)
 
             frame = self.draw_output(frame, results, letter, chord, self.mode, label)
 
             cv2.imshow("ASL Chord Recognizer", frame)
 
-            if cv2.waitKey(1) & 0xFF == 27:
+            key = cv2.waitKey(1) & 0xFF
+            if key == 27:
                 break
 
         cap.release()
@@ -158,6 +216,6 @@ class ASLChordRecognizer:
 
 # -----------------------------
 if __name__ == "__main__":
-    mode = input("Enter mode (collect/predict): ")
+    mode = input("Enter mode (collect/predict): ").strip().lower()
     app = ASLChordRecognizer(mode=mode)
     app.run()
