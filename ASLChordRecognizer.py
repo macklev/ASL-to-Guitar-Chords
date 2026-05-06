@@ -64,8 +64,7 @@ class ASLChordRecognizer:
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         rgb.flags.writeable = False
         return frame, rgb
-
-    # -----------------------------
+    
     def extract_landmarks(self, results):
         if not results.multi_hand_landmarks:
             return None, None
@@ -85,13 +84,13 @@ class ASLChordRecognizer:
 
         return coords, features
 
-    # -----------------------------
+
     def collect_data(self, features, label):
         with open("asl_data.csv", "a", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(list(features) + [label])
 
-    # -----------------------------
+
     def predict_letter(self, features):
         if self.model is None:
             print("Model is None — asl_model.pkl did not load")
