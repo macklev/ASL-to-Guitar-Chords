@@ -12,7 +12,6 @@ class ASLChordRecognizer:
     def __init__(self, mode="predict"):
         self.mode = mode
 
-        # MediaPipe setup
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
             static_image_mode=False,
@@ -22,10 +21,8 @@ class ASLChordRecognizer:
         )
         self.mp_draw = mp.solutions.drawing_utils
 
-        # Smoothing
         self.history = deque(maxlen=5)
 
-        # Model
         self.model = None
         if self.mode == "predict":
             try:
@@ -33,7 +30,6 @@ class ASLChordRecognizer:
             except:
                 print("No model found. Run training first.")
 
-        # Chord mapping
         self.chord_map = {
             "A": "A Major",
             "B": "B Major",
@@ -77,7 +73,6 @@ class ASLChordRecognizer:
 
         coords = np.array(coords)
 
-        # Normalize relative to wrist
         coords = coords - coords[0]
 
         features = coords.flatten()
